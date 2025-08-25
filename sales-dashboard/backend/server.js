@@ -12,13 +12,13 @@ app.use(cors()); // Enable Cross-Origin Resource Sharing
 app.use(express.json()); // Allow the server to parse JSON request bodies
 
 // Health check endpoint
-app.get('/', (req, res) => {
-    res.json({ 
-        status: 'OK', 
-        message: 'Sales Dashboard API is running',
-        timestamp: new Date().toISOString()
-    });
-});
+// app.get('/', (req, res) => {
+//     res.json({ 
+//         status: 'OK', 
+//         message: 'Sales Dashboard API is running',
+//         timestamp: new Date().toISOString()
+//     });
+// });
 
 // --- In-memory cache for environment-specific access tokens ---
 const tokenCache = {
