@@ -111,7 +111,7 @@ function App() {
       setLoading(true);
       setError(null);
       try {
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+        const apiUrl = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001');
         const response = await axios.post(`${apiUrl}/api/orders`, {
           startDate,
           endDate,

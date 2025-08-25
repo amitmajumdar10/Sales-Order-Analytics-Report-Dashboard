@@ -3,6 +3,7 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -11,14 +12,19 @@ const PORT = process.env.PORT || 3001; // Port for our backend server
 app.use(cors()); // Enable Cross-Origin Resource Sharing
 app.use(express.json()); // Allow the server to parse JSON request bodies
 
-// Health check endpoint
-// app.get('/', (req, res) => {
-//     res.json({ 
-//         status: 'OK', 
-//         message: 'Sales Dashboard API is running',
-//         timestamp: new Date().toISOString()
-//     });
-// });
+// Serve static files from the React app build directory
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../frontend/build')));
+}
+
+// Health check endpoint for API
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        message: 'Sales Dashboard API is running',
+        timestamp: new Date().toISOString()
+    });
+});
 
 // --- In-memory cache for environment-specific access tokens ---
 const tokenCache = {
@@ -280,6 +286,13 @@ app.post('/api/orders', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch order data.' });
     }
 });
+
+// Catch-all handler: send back React's index.html file for any non-API routes
+if (process.env.NODE_ENV === 'production') {
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+    });
+}
 
 app.listen(PORT, () => {
     console.log(`Backend server is running on http://localhost:${PORT}`);
