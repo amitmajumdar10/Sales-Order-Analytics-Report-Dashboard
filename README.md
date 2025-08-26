@@ -1,0 +1,235 @@
+# Sales Order Dashboard
+
+A comprehensive sales analytics dashboard built with React and Express.js that provides real-time insights into order data with advanced filtering capabilities.
+
+## Features
+
+- **📊 Interactive Dashboard**: Real-time sales metrics with beautiful charts and KPIs
+- **📅 Date Range Filtering**: Select custom date ranges to analyze specific periods
+- **🏷️ Order Type Filtering**: Filter between Prepaid and Postpaid orders
+- **💳 Payment Method Filtering**: Analyze orders by specific payment methods
+- **🌍 Environment Switching**: Switch between Development and Production environments
+- **📈 Visual Analytics**: Line charts for daily trends and bar charts for customer segmentation
+- **🔄 Automatic Pagination**: Handles large datasets by automatically fetching all orders
+- **⚡ Real-time Updates**: Dashboard updates automatically when filters change
+- **🛡️ Error Handling**: Graceful error handling with user-friendly messages
+
+## Tech Stack
+
+### Frontend
+- **React 19.1.1** - Modern UI framework
+- **Chart.js 4.5.0** - Interactive charts and visualizations
+- **Axios 1.11.0** - HTTP client for API calls
+- **CSS3** - Custom styling and responsive design
+
+### Backend
+- **Node.js** - Runtime environment
+- **Express.js 5.1.0** - Web framework
+- **Axios 1.11.0** - External API integration
+- **CORS 2.8.5** - Cross-origin resource sharing
+- **dotenv 17.2.1** - Environment variable management
+
+## Prerequisites
+
+- Node.js (v14 or higher)
+- npm (v6 or higher)
+- Access to the order search API (requires environment variables)
+
+## Quick Start
+
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd sales-dashboard
+```
+
+### 2. Install Dependencies
+```bash
+npm run install:all
+```
+
+### 3. Environment Setup
+Create a `.env` file in the `backend` directory with environment-specific configurations:
+```env
+# Development Environment Configuration
+API_BASE_URL_DEV=https://dev-api.example.com
+CLIENT_ID_DEV=dev_client_id_here
+AUTH_HEADER_DEV=Basic dev_auth_header_here
+
+# Production Environment Configuration
+API_BASE_URL_PRD=https://prod-api.example.com
+CLIENT_ID_PRD=prod_client_id_here
+AUTH_HEADER_PRD=Basic prod_auth_header_here
+```
+
+### 4. Start the Application
+```bash
+npm start
+```
+
+This single command will start both the backend server (port 3001) and frontend development server (port 3000).
+
+## Available Scripts
+
+### Root Level Commands
+- `npm start` - Start both frontend and backend in production mode
+- `npm run dev` - Start both services in development mode (with nodemon for backend)
+- `npm run install:all` - Install dependencies for root, backend, and frontend
+- `npm run build` - Build the frontend for production
+- `npm run start:backend` - Start only the backend server
+- `npm run start:frontend` - Start only the frontend server
+
+### Individual Service Commands
+
+#### Backend (in `/backend` directory)
+- `npm start` - Start the Express server
+- `npm run dev` - Start with nodemon for auto-restart on changes
+
+#### Frontend (in `/frontend` directory)
+- `npm start` - Start the React development server
+- `npm run build` - Create production build
+- `npm test` - Run tests
+
+## Application Structure
+
+```
+sales-dashboard/
+├── backend/                 # Express.js backend
+│   ├── server.js           # Main server file with API endpoints
+│   ├── package.json        # Backend dependencies
+│   └── .env               # Environment variables (create this)
+├── frontend/               # React frontend
+│   ├── src/
+│   │   ├── App.js         # Main React component
+│   │   ├── App.css        # Styling
+│   │   └── index.js       # Entry point
+│   ├── public/            # Static assets
+│   └── package.json       # Frontend dependencies
+├── package.json           # Root package.json with scripts
+└── README.md             # This file
+```
+
+## API Endpoints
+
+### POST `/api/orders`
+Fetches and processes order data based on filters.
+
+**Request Body:**
+```json
+{
+  "startDate": "2025-01-01T00:00:00.000Z",
+  "endDate": "2025-01-31T23:59:59.999Z",
+  "orderType": "Prepaid",
+  "paymentMethod": "COD",
+  "environment": "DEV"
+}
+```
+
+**Response:**
+```json
+{
+  "dailyMetrics": {
+    "2025-01-01": {
+      "orders": 150,
+      "revenue": 45000,
+      "units": 300
+    }
+  },
+  "customerBreakdown": {
+    "new": 75,
+    "returning": 75,
+    "registered": 100,
+    "unregistered": 50
+  },
+  "kpis": {
+    "totalOrders": 150,
+    "totalRevenue": 45000,
+    "totalUnits": 300,
+    "avgOrderValue": 300,
+    "avgUnitsPerTransaction": 2
+  }
+}
+```
+
+## Filter Options
+
+### Order Types
+- **Prepaid**: Prepaid service orders
+- **Postpaid**: Postpaid service orders
+
+### Payment Methods
+- `CHARGE_TO_BILL` - Bill-based charging
+- `CHARGE_TO_LOAD` - Load-based charging  
+- `COD` - Cash on Delivery
+- `Home_Credit` - Home credit payments
+- `Credit_Card_Instalment` - Credit card installments
+- `Maya` - Maya digital wallet
+- `PayLater` - Pay later services
+- `Prepaid_MNP_Free` - Free prepaid MNP
+
+## Key Features Explained
+
+### Automatic Pagination
+The backend automatically handles pagination when the API returns more than 200 orders, making multiple requests to fetch all data for the selected date range.
+
+### Real-time Filtering
+Orders are filtered client-side after fetching to provide instant results when changing payment methods, while maintaining server-side filtering for order types and date ranges.
+
+### Error Handling
+- **Network Errors**: Graceful handling of API failures
+- **Invalid Dates**: Validation of date range inputs  
+- **No Data**: User-friendly messages when no orders match filters
+- **Persistent UI**: Input controls remain accessible during error states
+
+### Responsive Design
+The dashboard is fully responsive and works on desktop, tablet, and mobile devices.
+
+## Development
+
+### Adding New Payment Methods
+1. Add the new option to the frontend dropdown in `App.js`
+2. The backend will automatically handle the new payment method ID
+
+### Adding New Filters
+1. Add state management in `App.js`
+2. Update the API call to include the new parameter
+3. Modify the backend to accept and process the new filter
+4. Update the `processOrderData` function if needed
+
+### Customizing Charts
+Charts are built with Chart.js and can be customized by modifying the chart configuration objects in `App.js`.
+
+## Troubleshooting
+
+### Common Issues
+
+**Backend server won't start:**
+- Check that the `.env` file exists in the `backend` directory
+- Verify all required environment variables are set
+- Ensure port 3001 is not already in use
+
+**Frontend can't connect to backend:**
+- Verify the backend is running on port 3001
+- Check for CORS issues in browser console
+- Ensure the API URL in `App.js` matches the backend port
+
+**No data showing:**
+- Check the date range (ensure it includes orders)
+- Verify the selected filters aren't too restrictive
+- Check browser console for API errors
+
+### Logs
+- Backend logs are visible in the terminal running the backend server
+- Frontend logs are available in the browser's developer console
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is licensed under the ISC License.
