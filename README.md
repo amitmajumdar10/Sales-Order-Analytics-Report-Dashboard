@@ -1,6 +1,8 @@
 # Sales Order Dashboard
 
-A comprehensive sales analytics dashboard built with React and Express.js that provides real-time insights into order data with advanced filtering capabilities.
+A comprehensive sales analytics dashboard for Salesforce B2C Commerce Cloud order data analysis, built with React and Express.js that provides real-time insights into order data with advanced filtering capabilities. Under the hood, the application uses Salesforce B2C Commerce Cloud APIs to pull order data from a Salesforce B2C Commerce Instance.
+
+**Note:** This dashboard is designed for custom analytics and is not a replacement for CCAC (Reports and Dashboards).
 
 ## Features
 
@@ -12,6 +14,7 @@ A comprehensive sales analytics dashboard built with React and Express.js that p
 - **📈 Visual Analytics**: Line charts for daily trends and bar charts for customer segmentation
 - **🔄 Automatic Pagination**: Handles large datasets by automatically fetching all orders
 - **⚡ Real-time Updates**: Dashboard updates automatically when filters change
+- **💾 In-Memory Caching**: Caches API responses for 30 minutes to improve performance and reduce API calls
 - **🛡️ Error Handling**: Graceful error handling with user-friendly messages
 
 ## Tech Stack
@@ -28,12 +31,14 @@ A comprehensive sales analytics dashboard built with React and Express.js that p
 - **Axios 1.11.0** - External API integration
 - **CORS 2.8.5** - Cross-origin resource sharing
 - **dotenv 17.2.1** - Environment variable management
+- **node-cache 5.1.2** - In-memory caching for API responses
 
 ## Prerequisites
 
 - Node.js (v14 or higher)
 - npm (v6 or higher)
-- Access to the order search API (requires environment variables)
+- Access to Salesforce B2C Commerce Cloud APIs (requires environment variables)
+- Valid Salesforce B2C Commerce Instance with order data
 
 ## Quick Start
 
@@ -49,17 +54,17 @@ npm run install:all
 ```
 
 ### 3. Environment Setup
-Create a `.env` file in the `backend` directory with environment-specific configurations:
+Create a `.env` file in the `backend` directory with Salesforce B2C Commerce Cloud environment-specific configurations:
 ```env
-# Development Environment Configuration
-API_BASE_URL_DEV=https://dev-api.example.com
-CLIENT_ID_DEV=dev_client_id_here
-AUTH_HEADER_DEV=Basic dev_auth_header_here
+# Development Environment Configuration (Salesforce B2C Commerce Cloud)
+API_BASE_URL_DEV=https://your-dev-instance.demandware.net
+CLIENT_ID_DEV=your_dev_client_id_here
+AUTH_HEADER_DEV=Basic your_dev_auth_header_here
 
-# Production Environment Configuration
-API_BASE_URL_PRD=https://prod-api.example.com
-CLIENT_ID_PRD=prod_client_id_here
-AUTH_HEADER_PRD=Basic prod_auth_header_here
+# Production Environment Configuration (Salesforce B2C Commerce Cloud)
+API_BASE_URL_PRD=https://your-prod-instance.demandware.net
+CLIENT_ID_PRD=your_prod_client_id_here
+AUTH_HEADER_PRD=Basic your_prod_auth_header_here
 ```
 
 ### 4. Start the Application
@@ -112,7 +117,7 @@ sales-dashboard/
 ## API Endpoints
 
 ### POST `/api/orders`
-Fetches and processes order data based on filters.
+Fetches and processes order data from Salesforce B2C Commerce Cloud based on filters. Responses are cached in-memory for 30 minutes to improve performance and reduce external API calls to the Commerce Cloud instance.
 
 **Request Body:**
 ```json
@@ -151,6 +156,47 @@ Fetches and processes order data based on filters.
 }
 ```
 
+### GET `/api/cache/stats`
+Returns cache statistics including total keys, cache hits/misses, and current cached keys.
+
+**Response:**
+```json
+{
+  "stats": {
+    "keys": 3,
+    "hits": 15,
+    "misses": 8,
+    "ksize": 3,
+    "vsize": 3
+  },
+  "totalKeys": 3,
+  "keys": ["orders_DEV_Prepaid_2025-01-01_2025-01-31"],
+  "message": "Cache statistics retrieved successfully"
+}
+```
+
+### DELETE `/api/cache/clear`
+Clears all cached entries.
+
+**Response:**
+```json
+{
+  "message": "Cache cleared successfully. Removed 3 entries.",
+  "clearedKeys": 3
+}
+```
+
+### DELETE `/api/cache/clear/:key`
+Clears a specific cache entry by key.
+
+**Response:**
+```json
+{
+  "message": "Cache entry for key 'orders_DEV_Prepaid_2025-01-01_2025-01-31' cleared successfully.",
+  "deleted": true
+}
+```
+
 ## Filter Options
 
 ### Order Types
@@ -169,20 +215,50 @@ Fetches and processes order data based on filters.
 
 ## Key Features Explained
 
+### In-Memory Caching
+The application uses node-cache to implement intelligent caching of Salesforce B2C Commerce Cloud API responses:
+- **Cache Duration**: Responses are cached for 30 minutes (configurable)
+- **Cache Keys**: Generated based on request parameters (environment, order type, date range)
+- **Performance**: Subsequent identical requests return instantly from cache, reducing load on Commerce Cloud
+- **Memory Management**: Automatic cleanup of expired entries every minute
+- **Cache Management**: Built-in endpoints to monitor and clear cache when needed
+
 ### Automatic Pagination
-The backend automatically handles pagination when the API returns more than 200 orders, making multiple requests to fetch all data for the selected date range.
+The backend automatically handles pagination when the Salesforce B2C Commerce Cloud API returns more than 200 orders, making multiple requests to fetch all data for the selected date range.
 
 ### Real-time Filtering
 Orders are filtered client-side after fetching to provide instant results when changing payment methods, while maintaining server-side filtering for order types and date ranges.
 
 ### Error Handling
-- **Network Errors**: Graceful handling of API failures
+- **Network Errors**: Graceful handling of Salesforce B2C Commerce Cloud API failures
 - **Invalid Dates**: Validation of date range inputs  
 - **No Data**: User-friendly messages when no orders match filters
 - **Persistent UI**: Input controls remain accessible during error states
 
 ### Responsive Design
 The dashboard is fully responsive and works on desktop, tablet, and mobile devices.
+
+## Salesforce B2C Commerce Cloud Integration
+
+This dashboard integrates directly with Salesforce B2C Commerce Cloud APIs to provide custom analytics capabilities:
+
+### API Integration
+- Uses Salesforce B2C Commerce Cloud Order Search API (`/dw/shop/v24_5/order_search`)
+- Supports both Development and Production Commerce Cloud instances
+- Implements OAuth 2.0 authentication for secure API access
+- Handles Commerce Cloud API rate limits through intelligent caching
+
+### Relationship with CCAC
+- **Complementary Tool**: This dashboard is designed to complement, not replace, CCAC (Reports and Dashboards)
+- **Custom Analytics**: Provides specialized views and filtering options not available in standard CCAC reports
+- **Real-time Data**: Offers near real-time order analysis with custom date ranges and filters
+- **Enhanced Visualization**: Features interactive charts and KPIs tailored for specific business needs
+
+### Use Cases
+- Custom order analysis beyond standard CCAC capabilities
+- Real-time monitoring of order trends and patterns
+- Specialized filtering by payment methods and order types
+- Cross-environment order data comparison (DEV vs PRD)
 
 ## Development
 
@@ -217,6 +293,7 @@ Charts are built with Chart.js and can be customized by modifying the chart conf
 - Check the date range (ensure it includes orders)
 - Verify the selected filters aren't too restrictive
 - Check browser console for API errors
+- Try clearing the cache using `DELETE /api/cache/clear` if data seems stale
 
 ### Logs
 - Backend logs are visible in the terminal running the backend server
