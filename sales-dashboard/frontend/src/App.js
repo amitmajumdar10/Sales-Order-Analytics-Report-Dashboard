@@ -39,6 +39,11 @@ function App() {
   const [orderType, setOrderType] = useState('Prepaid'); // Default to Prepaid
   const [paymentMethod, setPaymentMethod] = useState(''); // Default to empty (all payment methods)
   const [environment, setEnvironment] = useState('DEV'); // Default to DEV
+  
+  // Configurable fields state
+  const [availableFields, setAvailableFields] = useState({});
+  const [fieldsLoading, setFieldsLoading] = useState(true);
+  const [additionalFilters, setAdditionalFilters] = useState({}); // Store values for configurable fields
 
   // Client-side function to process and filter order data
   const processOrderData = (hits, paymentMethodFilter) => {
@@ -105,6 +110,31 @@ function App() {
     };
   };
 
+  // Effect for fetching available configurable fields
+  useEffect(() => {
+    const fetchAvailableFields = async () => {
+      try {
+        const apiUrl = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001');
+        const response = await axios.get(`${apiUrl}/api/config/fields`);
+        
+        if (response.data.success) {
+          setAvailableFields(response.data.fields);
+          console.log('📋 Available fields loaded:', response.data.fields);
+        } else {
+          console.warn('⚠️ No configurable fields available');
+          setAvailableFields({});
+        }
+      } catch (err) {
+        console.error('❌ Error fetching available fields:', err);
+        setAvailableFields({});
+      } finally {
+        setFieldsLoading(false);
+      }
+    };
+
+    fetchAvailableFields();
+  }, []);
+
   // Effect for fetching data from API (excludes paymentMethod from dependencies)
   useEffect(() => {
     const fetchData = async () => {
@@ -117,6 +147,7 @@ function App() {
           endDate,
           orderType,
           environment,
+          ...additionalFilters, // Include additional configurable filters
         });
         setRawData(response.data.hits); // Store the raw hits data for client-side filtering
       } catch (err) {
@@ -128,7 +159,7 @@ function App() {
     };
 
     fetchData();
-  }, [startDate, endDate, orderType, environment]); // Refetch data when dates, order type, or environment change (excludes paymentMethod)
+  }, [startDate, endDate, orderType, environment, additionalFilters]); // Refetch data when dates, order type, environment, or additional filters change (excludes paymentMethod)
 
   // Effect for client-side filtering when payment method changes
   useEffect(() => {
@@ -137,6 +168,14 @@ function App() {
       setData(processedData);
     }
   }, [rawData, paymentMethod]); // Process data when rawData or paymentMethod changes
+
+  // Handler for additional filter changes
+  const handleAdditionalFilterChange = (fieldKey, value) => {
+    setAdditionalFilters(prev => ({
+      ...prev,
+      [fieldKey]: value
+    }));
+  };
 
   // Get filtered orders for the table
   const getFilteredOrders = () => {
@@ -209,35 +248,118 @@ function App() {
     <div className="container">
       <header>
         <div><h1>Sales Order Report & Dashboard</h1></div>
-        <div className="date-picker">
-          <label>Environment: </label>
-          <select value={environment} onChange={e => setEnvironment(e.target.value)}>
-            <option value="DEV">DEV</option>
-            <option value="PRD">PRD</option>
-          </select>
-          <label>From: </label>
-          <input type="date" value={startDate.split('T')[0]} onChange={e => setStartDate(new Date(e.target.value).toISOString())} />
-          <label>To: </label>
-          <input type="date" value={endDate.split('T')[0]} onChange={e => setEndDate(new Date(e.target.value).toISOString())} />
-          <label>Order Type: </label>
-          <select value={orderType} onChange={e => setOrderType(e.target.value)}>
-            <option value="Prepaid">Prepaid</option>
-            <option value="Postpaid">Postpaid</option>
-          </select>
-          <label>Payment Method: </label>
-          <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-            <option value="">All Payment Methods</option>
-            <option value="CHARGE_TO_BILL">CHARGE_TO_BILL</option>
-            <option value="CHARGE_TO_LOAD">CHARGE_TO_LOAD</option>
-            <option value="COD">COD</option>
-            <option value="Home_Credit">Home_Credit</option>
-            <option value="Credit_Card_Instalment">Credit_Card_Instalment</option>
-            <option value="Maya">Maya</option>
-            <option value="PayLater">PayLater</option>
-            <option value="Prepaid_MNP_Free">Prepaid_MNP_Free</option>
-          </select>
-        </div>
       </header>
+
+      {/* Filters Section */}
+      <div className="filters-container">
+        {/* Row 1: Environment and Date Fields */}
+        <div className="filters-row primary-filters">
+          <div className="filter-field">
+            <label>Environment</label>
+            <select value={environment} onChange={e => setEnvironment(e.target.value)}>
+              <option value="DEV">DEV</option>
+              <option value="PRD">PRD</option>
+            </select>
+          </div>
+          <div className="filter-field">
+            <label>From Date</label>
+            <input 
+              type="date" 
+              value={startDate.split('T')[0]} 
+              onChange={e => setStartDate(new Date(e.target.value).toISOString())} 
+            />
+          </div>
+          <div className="filter-field">
+            <label>To Date</label>
+            <input 
+              type="date" 
+              value={endDate.split('T')[0]} 
+              onChange={e => setEndDate(new Date(e.target.value).toISOString())} 
+            />
+          </div>
+        </div>
+
+        {/* Row 2+: Other Fields (max 3 per row) */}
+        {(!fieldsLoading) && (() => {
+          // Collect all secondary fields
+          const secondaryFields = [];
+          
+          // Add Order Type field if configured
+          if (availableFields.order_type) {
+            secondaryFields.push({
+              key: 'order_type',
+              label: availableFields.order_type.label,
+              component: (
+                <select value={orderType} onChange={e => setOrderType(e.target.value)}>
+                  {availableFields.order_type.options.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              )
+            });
+          }
+          
+          // Add additional configurable fields
+          Object.keys(availableFields).forEach(fieldKey => {
+            if (fieldKey === 'order_type') return; // Already handled above
+            
+            const field = availableFields[fieldKey];
+            const currentValue = additionalFilters[fieldKey] || '';
+            
+            secondaryFields.push({
+              key: fieldKey,
+              label: field.label,
+              component: (
+                <select 
+                  value={currentValue} 
+                  onChange={e => handleAdditionalFilterChange(fieldKey, e.target.value)}
+                >
+                  <option value="">All {field.label}</option>
+                  {field.options.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              )
+            });
+          });
+          
+          // Add Payment Method field
+          secondaryFields.push({
+            key: 'payment_method',
+            label: 'Payment Method',
+            component: (
+              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+                <option value="">All Payment Methods</option>
+                <option value="CHARGE_TO_BILL">CHARGE_TO_BILL</option>
+                <option value="CHARGE_TO_LOAD">CHARGE_TO_LOAD</option>
+                <option value="COD">COD</option>
+                <option value="Home_Credit">Home_Credit</option>
+                <option value="Credit_Card_Instalment">Credit_Card_Instalment</option>
+                <option value="Maya">Maya</option>
+                <option value="PayLater">PayLater</option>
+                <option value="Prepaid_MNP_Free">Prepaid_MNP_Free</option>
+              </select>
+            )
+          });
+          
+          // Group fields into rows of max 3
+          const rows = [];
+          for (let i = 0; i < secondaryFields.length; i += 3) {
+            rows.push(secondaryFields.slice(i, i + 3));
+          }
+          
+          return rows.map((row, rowIndex) => (
+            <div key={rowIndex} className="filters-row secondary-filters">
+              {row.map(field => (
+                <div key={field.key} className="filter-field">
+                  <label>{field.label}</label>
+                  {field.component}
+                </div>
+              ))}
+            </div>
+          ));
+        })()}
+      </div>
 
       {loading && (
         <div className="loading-message">

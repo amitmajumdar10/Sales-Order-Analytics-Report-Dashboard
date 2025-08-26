@@ -35,15 +35,169 @@ app.get('/api/health', (req, res) => {
 });
 
 /**
+ * Gets field options from environment variables
+ * @param {string} fieldKey - The field key (e.g., 'order_type')
+ * @returns {Array} - Array of options for the field
+ */
+const getFieldOptionsFromEnv = (fieldKey) => {
+    const envKey = `TERM_QUERY_FIELD_${fieldKey.toUpperCase()}_VALUES`;
+    const envValue = process.env[envKey];
+    
+    if (envValue && envValue.trim() !== '') {
+        return envValue.split(',').map(option => option.trim()).filter(option => option !== '');
+    }
+    
+    return []; // Return empty array if no values defined
+};
+
+// Get available configurable fields endpoint
+app.get('/api/config/fields', (req, res) => {
+    try {
+        const configurableFields = getConfigurableTermQueryFields();
+        
+        // Default field labels
+        const fieldLabels = {
+            order_type: 'Order Type',
+            customer_type: 'Customer Type',
+            channel: 'Channel',
+            region: 'Region',
+            store_id: 'Store ID'
+        };
+        
+        const availableFields = {};
+        
+        // Only include fields that are configured in environment AND have dropdown values
+        Object.keys(configurableFields).forEach(fieldKey => {
+            const options = getFieldOptionsFromEnv(fieldKey);
+            
+            // Only include fields that have dropdown options defined
+            if (options.length > 0) {
+                availableFields[fieldKey] = {
+                    apiField: configurableFields[fieldKey],
+                    label: fieldLabels[fieldKey] || fieldKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    options: options
+                };
+            } else {
+                console.log(`⚠️ Skipping field '${fieldKey}' - no dropdown values defined in TERM_QUERY_FIELD_${fieldKey.toUpperCase()}_VALUES`);
+            }
+        });
+        
+        console.log('📋 Returning field configuration:', availableFields);
+        
+        res.json({
+            success: true,
+            fields: availableFields,
+            message: 'Available configurable fields retrieved successfully'
+        });
+    } catch (error) {
+        console.error('❌ Error getting configurable fields:', error.message);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to retrieve configurable fields',
+            fields: {}
+        });
+    }
+});
+
+/**
+ * Gets configurable term query fields from environment variables
+ * @returns {Object} - Object containing available term query fields
+ */
+const getConfigurableTermQueryFields = () => {
+    const fields = {};
+    
+    // Iterate through all environment variables to find TERM_QUERY_FIELD_ prefixed ones
+    Object.keys(process.env).forEach(key => {
+        if (key.startsWith('TERM_QUERY_FIELD_')) {
+            const fieldKey = key.replace('TERM_QUERY_FIELD_', '').toLowerCase();
+            const fieldValue = process.env[key];
+            if (fieldValue) {
+                fields[fieldKey] = fieldValue;
+            }
+        }
+    });
+    
+    console.log('📋 Configurable Term Query Fields:', fields);
+    return fields;
+};
+
+/**
+ * Builds the bool query must array with configurable term queries
+ * @param {Object} requestData - Request data containing filter values
+ * @param {Object} configurableFields - Available configurable fields
+ * @returns {Array} - Array of term query objects
+ */
+const buildTermQueries = (requestData, configurableFields) => {
+    const termQueries = [];
+    
+    // Always include the status filter (required)
+    termQueries.push({
+        "term_query": {
+            "fields": ["status"],
+            "operator": "not_in",
+            "values": ["created", "failed"]
+        }
+    });
+    
+    // Add configurable term queries based on request data and available fields
+    Object.keys(configurableFields).forEach(fieldKey => {
+        const fieldName = configurableFields[fieldKey];
+        let fieldValue = null;
+        
+        // Map request data to field values
+        switch (fieldKey) {
+            case 'order_type':
+                fieldValue = requestData.orderType;
+                break;
+            case 'customer_type':
+                fieldValue = requestData.customerType;
+                break;
+            case 'channel':
+                fieldValue = requestData.channel;
+                break;
+            case 'region':
+                fieldValue = requestData.region;
+                break;
+            case 'store_id':
+                fieldValue = requestData.storeId;
+                break;
+            default:
+                // For any other fields, try to find them in request data
+                fieldValue = requestData[fieldKey];
+                break;
+        }
+        
+        // Add term query if field value is provided
+        if (fieldValue && fieldValue.trim() !== '') {
+            termQueries.push({
+                "term_query": {
+                    "fields": [fieldName],
+                    "operator": "is",
+                    "values": [fieldValue]
+                }
+            });
+        }
+    });
+    
+    return termQueries;
+};
+
+/**
  * Generates a cache key based on request parameters
  * @param {string} startDate - Start date for the query
  * @param {string} endDate - End date for the query
- * @param {string} orderType - Order type filter
+ * @param {Object} requestData - All request data for generating unique cache key
  * @param {string} environment - Environment (DEV/PRD)
  * @returns {string} - Cache key
  */
-const generateCacheKey = (startDate, endDate, orderType, environment) => {
-    return `orders_${environment}_${orderType}_${startDate}_${endDate}`;
+const generateCacheKey = (startDate, endDate, requestData, environment) => {
+    // Create a sorted string of all filter values for consistent cache keys
+    const filterValues = Object.keys(requestData)
+        .sort()
+        .map(key => `${key}:${requestData[key] || ''}`)
+        .join('_');
+    
+    return `orders_${environment}_${startDate}_${endDate}_${filterValues}`;
 };
 
 // --- In-memory cache for environment-specific access tokens ---
@@ -200,21 +354,27 @@ const processOrderData = (hits, paymentMethod) => {
 // --- API Endpoint for the Frontend ---
 app.post('/api/orders', async (req, res) => {
     try {
-        const { startDate, endDate, orderType, environment } = req.body;
+        const { startDate, endDate, environment, ...otherFilters } = req.body;
         if (!startDate || !endDate) {
             return res.status(400).json({ error: 'Start date and end date are required.' });
         }
         
-        // Default to 'Prepaid' if orderType is not provided
-        const selectedOrderType = orderType || 'Prepaid';
-        
         // Default to 'DEV' if environment is not provided
         const selectedEnvironment = environment || 'DEV';
         
-        console.log(`🌍 API Request - Environment: ${selectedEnvironment}, OrderType: ${selectedOrderType}`);
+        // Prepare request data for processing
+        const requestData = {
+            orderType: otherFilters.orderType || 'Prepaid', // Default to Prepaid
+            ...otherFilters
+        };
+        
+        console.log(`🌍 API Request - Environment: ${selectedEnvironment}, Filters:`, requestData);
+        
+        // Get configurable term query fields
+        const configurableFields = getConfigurableTermQueryFields();
         
         // Generate cache key for this request
-        const cacheKey = generateCacheKey(startDate, endDate, selectedOrderType, selectedEnvironment);
+        const cacheKey = generateCacheKey(startDate, endDate, requestData, selectedEnvironment);
         
         // Check if data exists in cache
         const cachedData = orderCache.get(cacheKey);
@@ -229,6 +389,9 @@ app.post('/api/orders', async (req, res) => {
         const config = getEnvironmentConfig(selectedEnvironment);
 
         const token = await getAccessToken(selectedEnvironment);
+        
+        // Build dynamic term queries based on configuration and request data
+        const termQueries = buildTermQueries(requestData, configurableFields);
 
         const orderSearchPayload = {
             "query": {
@@ -242,30 +405,7 @@ app.post('/api/orders', async (req, res) => {
                     },
                     "query": {
                         "bool_query": {
-                            "must": [
-                                {
-                                    "term_query": {
-                                        "fields": [
-                                            "status"
-                                        ],
-                                        "operator": "not_in",
-                                        "values": [
-                                            "created", "failed"
-                                        ]
-                                    }
-                                },
-                                {
-                                    "term_query": {
-                                        "fields": [
-                                            "c_smartOrderType"
-                                        ],
-                                        "operator": "is",
-                                        "values": [
-                                            selectedOrderType // Dynamic order type from frontend
-                                        ]
-                                    }
-                                }
-                            ]
+                            "must": termQueries
                         }
                     }
                 }

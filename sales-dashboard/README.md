@@ -15,6 +15,7 @@ A comprehensive sales analytics dashboard for Salesforce B2C Commerce Cloud orde
 - **🔄 Automatic Pagination**: Handles large datasets by automatically fetching all orders
 - **⚡ Real-time Updates**: Dashboard updates automatically when filters change
 - **💾 In-Memory Caching**: Caches API responses for 30 minutes to improve performance and reduce API calls
+- **⚙️ Configurable Term Query Fields**: Dynamic filter fields configurable via environment variables
 - **🛡️ Error Handling**: Graceful error handling with user-friendly messages
 
 ## Tech Stack
@@ -65,6 +66,31 @@ AUTH_HEADER_DEV=Basic your_dev_auth_header_here
 API_BASE_URL_PRD=https://your-prod-instance.demandware.net
 CLIENT_ID_PRD=your_prod_client_id_here
 AUTH_HEADER_PRD=Basic your_prod_auth_header_here
+
+# Configurable Term Query Fields
+# Define which fields should be available for filtering in the order search query
+# Format: TERM_QUERY_FIELD_<FIELD_NAME>=<field_name_in_api>
+# The status field is always included and cannot be disabled
+
+# Order Type Field (c_smartOrderType) - Controls order type filtering (Prepaid/Postpaid)
+TERM_QUERY_FIELD_ORDER_TYPE=c_smartOrderType
+TERM_QUERY_FIELD_ORDER_TYPE_VALUES=Prepaid,Postpaid
+
+# Additional configurable fields (uncomment and modify as needed):
+# TERM_QUERY_FIELD_CUSTOMER_TYPE=c_customerType
+# TERM_QUERY_FIELD_CUSTOMER_TYPE_VALUES=New,Returning,VIP,Premium
+
+# TERM_QUERY_FIELD_CHANNEL=c_channel
+# TERM_QUERY_FIELD_CHANNEL_VALUES=Online,Store,Mobile,Call Center,Partner
+
+# TERM_QUERY_FIELD_REGION=c_region
+# TERM_QUERY_FIELD_REGION_VALUES=North,South,East,West,Central,International
+
+# TERM_QUERY_FIELD_STORE_ID=c_storeId
+# TERM_QUERY_FIELD_STORE_ID_VALUES=STORE001,STORE002,STORE003,STORE004,STORE005
+
+# Format for field values: TERM_QUERY_FIELD_<FIELD_NAME>_VALUES=value1,value2,value3
+# Note: Fields without VALUES defined will be ignored and not shown in the UI
 ```
 
 ### 4. Start the Application
@@ -156,6 +182,29 @@ Fetches and processes order data from Salesforce B2C Commerce Cloud based on fil
 }
 ```
 
+### GET `/api/config/fields`
+Returns available configurable term query fields and their dropdown options based on environment variables.
+
+**Response:**
+```json
+{
+  "success": true,
+  "fields": {
+    "order_type": {
+      "apiField": "c_smartOrderType",
+      "label": "Order Type",
+      "options": ["Prepaid", "Postpaid"]
+    },
+    "customer_type": {
+      "apiField": "c_customerType", 
+      "label": "Customer Type",
+      "options": ["New", "Returning", "VIP", "Premium"]
+    }
+  },
+  "message": "Available configurable fields retrieved successfully"
+}
+```
+
 ### GET `/api/cache/stats`
 Returns cache statistics including total keys, cache hits/misses, and current cached keys.
 
@@ -215,10 +264,19 @@ Clears a specific cache entry by key.
 
 ## Key Features Explained
 
+### Configurable Term Query Fields
+The application supports dynamic filter fields that can be configured via environment variables without code changes:
+- **Environment-Driven**: Fields are defined using `TERM_QUERY_FIELD_<NAME>=<api_field>` variables
+- **Dropdown Values**: Field options populated from `TERM_QUERY_FIELD_<NAME>_VALUES=value1,value2,value3`
+- **Dynamic UI**: Frontend automatically shows only configured fields with proper dropdown options
+- **Required Status Filter**: Always includes status filter (`not_in: ["created", "failed"]`) regardless of configuration
+- **Flexible Configuration**: Easy to add/remove fields per environment without touching application code
+- **API Integration**: Uses Salesforce B2C Commerce Cloud term_query structure for precise filtering
+
 ### In-Memory Caching
 The application uses node-cache to implement intelligent caching of Salesforce B2C Commerce Cloud API responses:
 - **Cache Duration**: Responses are cached for 30 minutes (configurable)
-- **Cache Keys**: Generated based on request parameters (environment, order type, date range)
+- **Cache Keys**: Generated based on request parameters (environment, order type, date range, configurable fields)
 - **Performance**: Subsequent identical requests return instantly from cache, reducing load on Commerce Cloud
 - **Memory Management**: Automatic cleanup of expired entries every minute
 - **Cache Management**: Built-in endpoints to monitor and clear cache when needed
@@ -262,15 +320,23 @@ This dashboard integrates directly with Salesforce B2C Commerce Cloud APIs to pr
 
 ## Development
 
+### Adding New Configurable Term Query Fields
+1. **Add Environment Variables**: Define the field and its values in `.env`:
+   ```env
+   TERM_QUERY_FIELD_DEPARTMENT=c_department
+   TERM_QUERY_FIELD_DEPARTMENT_VALUES=Electronics,Clothing,Books,Sports
+   ```
+2. **Restart Server**: No code changes needed - the field will automatically appear in the UI
+3. **Field Mapping**: Update the `buildTermQueries` function in `server.js` if custom field mapping is needed
+
 ### Adding New Payment Methods
 1. Add the new option to the frontend dropdown in `App.js`
 2. The backend will automatically handle the new payment method ID
 
-### Adding New Filters
-1. Add state management in `App.js`
-2. Update the API call to include the new parameter
-3. Modify the backend to accept and process the new filter
-4. Update the `processOrderData` function if needed
+### Customizing Field Labels and Options
+1. **Field Labels**: Modify the `fieldLabels` object in `/api/config/fields` endpoint
+2. **Dropdown Options**: Update environment variables with comma-separated values
+3. **Field Order**: Fields appear in the order they are processed (order_type first, then alphabetically)
 
 ### Customizing Charts
 Charts are built with Chart.js and can be customized by modifying the chart configuration objects in `App.js`.
@@ -294,6 +360,13 @@ Charts are built with Chart.js and can be customized by modifying the chart conf
 - Verify the selected filters aren't too restrictive
 - Check browser console for API errors
 - Try clearing the cache using `DELETE /api/cache/clear` if data seems stale
+
+**Configurable fields not appearing:**
+- Verify environment variables are properly set in `.env` file
+- Ensure both `TERM_QUERY_FIELD_<NAME>` and `TERM_QUERY_FIELD_<NAME>_VALUES` are defined
+- Check server console for field configuration warnings
+- Restart the backend server after adding new environment variables
+- Use `GET /api/config/fields` to verify field configuration
 
 ### Logs
 - Backend logs are visible in the terminal running the backend server
