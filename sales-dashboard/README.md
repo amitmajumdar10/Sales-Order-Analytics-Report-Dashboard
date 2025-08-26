@@ -100,6 +100,24 @@ npm start
 
 This single command will start both the backend server (port 3001) and frontend development server (port 3000).
 
+### 5. Environment Control (Optional)
+By default, only the DEV environment is available in the UI dropdown. To enable the PRD environment option:
+
+1. **Enable PRD Environment**: Set `ENABLE_PRD=true` in your `.env` file
+2. **Disable PRD Environment**: Set `ENABLE_PRD=false` in your `.env` file (default)
+3. **Restart the backend server** after changing this variable
+
+**Example:**
+```env
+# Enable PRD environment option in UI
+ENABLE_PRD=true
+
+# Disable PRD environment option in UI (default)
+ENABLE_PRD=false
+```
+
+**Note:** This provides an additional security layer by allowing you to completely hide production environment access from users when needed.
+
 ## Available Scripts
 
 ### Root Level Commands
@@ -338,6 +356,12 @@ This dashboard integrates directly with Salesforce B2C Commerce Cloud APIs to pr
 2. **Dropdown Options**: Update environment variables with comma-separated values
 3. **Field Order**: Fields appear in the order they are processed (order_type first, then alphabetically)
 
+### Controlling Environment Access
+1. **Enable PRD Access**: Set `ENABLE_PRD=true` in `.env` file
+2. **Disable PRD Access**: Set `ENABLE_PRD=false` in `.env` file (default)
+3. **Security**: Use this to hide production environment from specific deployments or users
+4. **Verification**: Check `/api/config/fields` response for `enablePrd` field status
+
 ### Customizing Charts
 Charts are built with Chart.js and can be customized by modifying the chart configuration objects in `App.js`.
 
@@ -367,6 +391,12 @@ Charts are built with Chart.js and can be customized by modifying the chart conf
 - Check server console for field configuration warnings
 - Restart the backend server after adding new environment variables
 - Use `GET /api/config/fields` to verify field configuration
+
+**PRD environment option not showing:**
+- Check that `ENABLE_PRD=true` is set in your `.env` file
+- Restart the backend server after changing the `ENABLE_PRD` variable
+- Verify the setting using `GET /api/config/fields` endpoint (check `enablePrd` field)
+- Ensure you have proper PRD environment variables configured (API_BASE_URL_PRD, etc.)
 
 ### Logs
 - Backend logs are visible in the terminal running the backend server

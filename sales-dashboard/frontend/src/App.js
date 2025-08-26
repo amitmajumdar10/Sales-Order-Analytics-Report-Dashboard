@@ -44,6 +44,7 @@ function App() {
   const [availableFields, setAvailableFields] = useState({});
   const [fieldsLoading, setFieldsLoading] = useState(true);
   const [additionalFilters, setAdditionalFilters] = useState({}); // Store values for configurable fields
+  const [enablePrd, setEnablePrd] = useState(false); // Control PRD environment visibility
 
   // Client-side function to process and filter order data
   const processOrderData = (hits, paymentMethodFilter) => {
@@ -119,10 +120,13 @@ function App() {
         
         if (response.data.success) {
           setAvailableFields(response.data.fields);
+          setEnablePrd(response.data.enablePrd || false);
           console.log('📋 Available fields loaded:', response.data.fields);
+          console.log('🔧 PRD Environment enabled:', response.data.enablePrd);
         } else {
           console.warn('⚠️ No configurable fields available');
           setAvailableFields({});
+          setEnablePrd(false);
         }
       } catch (err) {
         console.error('❌ Error fetching available fields:', err);
@@ -258,7 +262,7 @@ function App() {
             <label>Environment</label>
             <select value={environment} onChange={e => setEnvironment(e.target.value)}>
               <option value="DEV">DEV</option>
-              <option value="PRD">PRD</option>
+              {enablePrd && <option value="PRD">PRD</option>}
             </select>
           </div>
           <div className="filter-field">

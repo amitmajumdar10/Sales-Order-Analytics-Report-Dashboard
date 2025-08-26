@@ -87,6 +87,7 @@ app.get('/api/config/fields', (req, res) => {
         res.json({
             success: true,
             fields: availableFields,
+            enablePrd: process.env.ENABLE_PRD === 'true',
             message: 'Available configurable fields retrieved successfully'
         });
     } catch (error) {
