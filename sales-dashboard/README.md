@@ -12,6 +12,7 @@ A comprehensive sales analytics dashboard built with React and Express.js that p
 - **📈 Visual Analytics**: Line charts for daily trends and bar charts for customer segmentation
 - **🔄 Automatic Pagination**: Handles large datasets by automatically fetching all orders
 - **⚡ Real-time Updates**: Dashboard updates automatically when filters change
+- **💾 In-Memory Caching**: Caches API responses for 30 minutes to improve performance and reduce API calls
 - **🛡️ Error Handling**: Graceful error handling with user-friendly messages
 
 ## Tech Stack
@@ -28,6 +29,7 @@ A comprehensive sales analytics dashboard built with React and Express.js that p
 - **Axios 1.11.0** - External API integration
 - **CORS 2.8.5** - Cross-origin resource sharing
 - **dotenv 17.2.1** - Environment variable management
+- **node-cache 5.1.2** - In-memory caching for API responses
 
 ## Prerequisites
 
@@ -112,7 +114,7 @@ sales-dashboard/
 ## API Endpoints
 
 ### POST `/api/orders`
-Fetches and processes order data based on filters.
+Fetches and processes order data based on filters. Responses are cached in-memory for 30 minutes to improve performance and reduce external API calls.
 
 **Request Body:**
 ```json
@@ -151,6 +153,47 @@ Fetches and processes order data based on filters.
 }
 ```
 
+### GET `/api/cache/stats`
+Returns cache statistics including total keys, cache hits/misses, and current cached keys.
+
+**Response:**
+```json
+{
+  "stats": {
+    "keys": 3,
+    "hits": 15,
+    "misses": 8,
+    "ksize": 3,
+    "vsize": 3
+  },
+  "totalKeys": 3,
+  "keys": ["orders_DEV_Prepaid_2025-01-01_2025-01-31"],
+  "message": "Cache statistics retrieved successfully"
+}
+```
+
+### DELETE `/api/cache/clear`
+Clears all cached entries.
+
+**Response:**
+```json
+{
+  "message": "Cache cleared successfully. Removed 3 entries.",
+  "clearedKeys": 3
+}
+```
+
+### DELETE `/api/cache/clear/:key`
+Clears a specific cache entry by key.
+
+**Response:**
+```json
+{
+  "message": "Cache entry for key 'orders_DEV_Prepaid_2025-01-01_2025-01-31' cleared successfully.",
+  "deleted": true
+}
+```
+
 ## Filter Options
 
 ### Order Types
@@ -168,6 +211,14 @@ Fetches and processes order data based on filters.
 - `Prepaid_MNP_Free` - Free prepaid MNP
 
 ## Key Features Explained
+
+### In-Memory Caching
+The application uses node-cache to implement intelligent caching of API responses:
+- **Cache Duration**: Responses are cached for 30 minutes (configurable)
+- **Cache Keys**: Generated based on request parameters (environment, order type, date range)
+- **Performance**: Subsequent identical requests return instantly from cache
+- **Memory Management**: Automatic cleanup of expired entries every minute
+- **Cache Management**: Built-in endpoints to monitor and clear cache when needed
 
 ### Automatic Pagination
 The backend automatically handles pagination when the API returns more than 200 orders, making multiple requests to fetch all data for the selected date range.
@@ -217,6 +268,7 @@ Charts are built with Chart.js and can be customized by modifying the chart conf
 - Check the date range (ensure it includes orders)
 - Verify the selected filters aren't too restrictive
 - Check browser console for API errors
+- Try clearing the cache using `DELETE /api/cache/clear` if data seems stale
 
 ### Logs
 - Backend logs are visible in the terminal running the backend server
