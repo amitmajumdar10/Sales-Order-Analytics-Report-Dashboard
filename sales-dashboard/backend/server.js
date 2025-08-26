@@ -4,10 +4,18 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
+const NodeCache = require('node-cache');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001; // Port for our backend server
+
+// Initialize cache with TTL of 5 minutes (300 seconds) and check period of 1 minute (60 seconds)
+const orderCache = new NodeCache({ 
+    stdTTL: 1800, // Cache for 5 minutes
+    checkperiod: 60, // Check for expired keys every minute
+    useClones: false // For better performance, don't clone objects
+});
 
 app.use(cors()); // Enable Cross-Origin Resource Sharing
 app.use(express.json()); // Allow the server to parse JSON request bodies
@@ -25,6 +33,18 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
+
+/**
+ * Generates a cache key based on request parameters
+ * @param {string} startDate - Start date for the query
+ * @param {string} endDate - End date for the query
+ * @param {string} orderType - Order type filter
+ * @param {string} environment - Environment (DEV/PRD)
+ * @returns {string} - Cache key
+ */
+const generateCacheKey = (startDate, endDate, orderType, environment) => {
+    return `orders_${environment}_${orderType}_${startDate}_${endDate}`;
+};
 
 // --- In-memory cache for environment-specific access tokens ---
 const tokenCache = {
@@ -193,6 +213,18 @@ app.post('/api/orders', async (req, res) => {
         
         console.log(`🌍 API Request - Environment: ${selectedEnvironment}, OrderType: ${selectedOrderType}`);
         
+        // Generate cache key for this request
+        const cacheKey = generateCacheKey(startDate, endDate, selectedOrderType, selectedEnvironment);
+        
+        // Check if data exists in cache
+        const cachedData = orderCache.get(cacheKey);
+        if (cachedData) {
+            console.log(`💾 Cache HIT - Returning cached data for key: ${cacheKey}`);
+            return res.json(cachedData);
+        }
+        
+        console.log(`🔍 Cache MISS - Fetching fresh data for key: ${cacheKey}`);
+        
         // Get environment-specific configuration
         const config = getEnvironmentConfig(selectedEnvironment);
 
@@ -278,12 +310,65 @@ app.post('/api/orders', async (req, res) => {
 
         console.log(`Total orders fetched: ${allHits.length} out of ${total}`);
         
+        // Prepare response data
+        const responseData = { hits: allHits };
+        
+        // Cache the response data
+        orderCache.set(cacheKey, responseData);
+        console.log(`💾 Data cached successfully for key: ${cacheKey}`);
+        
         // Return raw hits data for client-side processing
-        res.json({ hits: allHits });
+        res.json(responseData);
 
     } catch (error) {
         console.error("Error in /api/orders:", error.message);
         res.status(500).json({ error: 'Failed to fetch order data.' });
+    }
+});
+
+// --- Cache Management Endpoints ---
+
+// Get cache statistics
+app.get('/api/cache/stats', (req, res) => {
+    const stats = orderCache.getStats();
+    const keys = orderCache.keys();
+    
+    res.json({
+        stats,
+        totalKeys: keys.length,
+        keys: keys,
+        message: 'Cache statistics retrieved successfully'
+    });
+});
+
+// Clear all cache
+app.delete('/api/cache/clear', (req, res) => {
+    const keyCount = orderCache.keys().length;
+    orderCache.flushAll();
+    
+    console.log(`🗑️ Cache cleared - Removed ${keyCount} cached entries`);
+    res.json({
+        message: `Cache cleared successfully. Removed ${keyCount} entries.`,
+        clearedKeys: keyCount
+    });
+});
+
+// Clear specific cache entry
+app.delete('/api/cache/clear/:key', (req, res) => {
+    const key = req.params.key;
+    const deleted = orderCache.del(key);
+    
+    if (deleted) {
+        console.log(`🗑️ Cache entry deleted - Key: ${key}`);
+        res.json({
+            message: `Cache entry for key '${key}' cleared successfully.`,
+            deleted: true
+        });
+    } else {
+        res.status(404).json({
+            message: `Cache entry for key '${key}' not found.`,
+            deleted: false
+        });
     }
 });
 
